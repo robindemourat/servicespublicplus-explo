@@ -6,7 +6,7 @@
 Puis copier-coller le code suivant dans le terminal :
 
 ```bash
-git clone github.com/robindemourat/servicespublicplus-explo
+git clone https://github.com/robindemourat/servicespublicplus-explo.git
 cd servicespublicplus-explo
 npm i
 ```
