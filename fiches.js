@@ -2,40 +2,131 @@ const fs = require('fs');
 
 import('d3-dsv')
   .then(dsv => {
-    // chargement du fichier
+    // chargement du fichier en csv
     let input = fs.readFileSync('inputs/export-experiences.csv', 'utf8');
-    input = dsv.dsvFormat(";").parse(input);
-    const outputPath = 'outputs/index.html';
-    const data = input
-    // décommenter la ligne ci-dessous (et commenter la suite avant const outputHTML) pour filtrer aux réponses IA
-      // .filter(d => d['Taux de similarité réponse IA structure 1'] === '100')
-      // commenter les lignes ci-dessous jusque const outputHTML pour enlever le filtre sur la description
-    .sort((a, b) => {
-      if (a['Description'].length > b['Description'].length) {
-        return -1;
+    // nettoyage des retours chariots
+    input = input.split('\n').reduce((res, line, i) => {
+      if (i > 1 && (line.match(/^([^;]+)$/gm) || !line.match(/^(\d+)/))) {
+        return res + '|' + line.trim();
       }
-      return 1;
-    })
-    .slice(0, 200);
-    // génération du template du contenu HTML
-    const outputHTML = `<!DOCTYPE html>
-<html lang="en">
+      return res + '\n' + line.trim();
+    }, '').trim();
+    input = dsv.dsvFormat(";").parse(input);
+
+    // const inputJSON = fs.readFileSync('inputs/export-experiences.json', 'utf8').trim();
+    // const cleanJSON = inputJSON.split('\n')
+    // .map((line, i) => {
+    //   if (i >= 50000 && i%50000 === 0) {
+    //     // delete last char
+    //     return line.substring(0, line.length - 2) + ',';
+    //   } else if (i >= 50000 && i%50000 === 1) {
+    //     // delete first char
+    //     console.log('test: ', line.substring(1))
+    //     return line.substring(1);
+    //   }
+    //   return line
+    // })
+    // .join('\n')
+    // const input = JSON.parse(cleanJSON)
+
+    const inputCleanCsv = dsv.csvFormat(input);
+    fs.writeFileSync(`outputs/input-clean.csv`, inputCleanCsv, 'utf8');
+    const baseFilter = input.filter(d => {
+      const respIA = ['1', '2', '3'].find(n => d[`Taux de similarité réponse IA structure ${n}`] !== '' && +d[`Taux de similarité réponse IA structure ${n}`] >= 50);
+      const neg = d['Ressenti usager'] === 'Négatif';
+      return respIA && neg;
+    });
+    
+    // let nbAvecRespIa = 0;
+    const iaResponses = input.reduce((res, d) => {
+      // let hasIt = false;
+      ['1', '2', '3']
+      .forEach(n => {
+        
+        const respIA = d[`Taux de similarité réponse IA structure ${n}`] !== '' && +d[`Taux de similarité réponse IA structure ${n}`] >= 50;
+        if (respIA) {
+          hasIt = true;
+          const respText = d[`Réponse structure ${n}`];
+          const item = {
+            text: respText,
+            structure: d[`Intitulé structure ${n}`]
+          };
+          res.push(item)
+        }
+      });
+      // if (hasIt && d['Ressenti usager'] === 'Négatif') {
+      //   nbAvecRespIa++;
+      // }
+      return res;
+    }, []);
+    // console.log('nb resp avec ia', nbAvecRespIa, input.length);
+    const sets = [
+      // {
+      //   fileName: 'respIA',
+      //   title: 'Réponses d\'IA sûr à 100%',
+      //   data: input.filter(d => d['Taux de similarité réponse IA structure 1'] === '100')
+      // },
+
+      {
+        fileName: 'baseFilter',
+        title: 'Réponse IA>50%, exp négative',
+        data: baseFilter
+      },
+      {
+        fileName: 'min1000',
+        title: 'Réponse IA>50%, exp négative, plus de 1000 caractères',
+        data: baseFilter.filter(d => d['Description'].length > 1000)
+      },
+      {
+        fileName: 'min2000',
+        title: 'Réponse IA>50%, exp négative, plus de 2000 caractères',
+        data: baseFilter.filter(d => d['Description'].length > 2000)
+      },
+      {
+        fileName: 'min2000_au_moins_un_acronyme',
+        title: 'Réponse IA>50%, exp négative, plus de 2000 caractères, au moins un acronyme',
+        data: baseFilter.filter(d => d['Description'].length > 2000 && d['Description'].match(/\b[A-Z]{3,20}\b/))
+      },
+      // {
+      //   fileName: 'romans',
+      //   title: 'Les 200 réponses les plus longues (pour comparaison)',
+      //   data: input
+      //   .sort((a, b) => {
+      //     if (a['Description'].length > b['Description'].length) {
+      //       return -1;
+      //     }
+      //     return 1;
+      //   })
+      //   .slice(0, 200)
+      // }
+    ];
+    sets.forEach(({fileName, data, title}) => {
+      const outputHTML = `<!DOCTYPE html>
+<html lang="fr">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Fiches services public plus</title>
+    <title>${title} – Fiches services public plus</title>
   </head>
   <body>
+<section class="page">
+<h1>Retours service public plus</h1>
+<ul>
+<li>nom du fichier : ${fileName}</li>
+<li>nombre de fiches : ${data.length}</li>
+<li>description du filtre : ${title}</li>
+</ul>
+</section>
   ${data.map(datum => {
       return `
 <section class="page">
 <h1>${datum['Titre']}</h1>
-<h3>${datum['Pseudonyme usager']} - ${datum['Écrit le']}</h3>
+<h3>${datum['Pseudonyme usager']} – le ${new Date(datum['Écrit le']).toLocaleDateString()}</h3>
 <blockquote>
 <p>
 <strong>
-${datum['Description']}
+${datum['Description'].replace(/\|+/gm, '<br/>')}
 </strong>
 </p>
 </blockquote>
@@ -63,7 +154,7 @@ ${[
               .filter(v => v.trim().length)
             values = Array.from(new Set(values)).join(', ');
             if (values.length) {
-              return `<li><strong>${name}</strong> : <span>${values}</span></li>`
+              return `<li><strong>${name}</strong> : <span>${values.replace(/\|+/gm, '<br/>')}</span></li>`
             }
             return ''
           })
@@ -100,7 +191,47 @@ section {
 }
 </style>
   </body>
+</html>`;
+      fs.writeFileSync(`outputs/${fileName}.html`, outputHTML, 'utf8');
+      fs.writeFileSync(`outputs/${fileName}.csv`, dsv.csvFormat(data), 'utf8');
+    })
+    const iaResponsesPath = 'outputs/iaResponses.html';
+    const iaResponsesHTML = `<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Fiches services public plus</title>
+  </head>
+  <body>
+  ${iaResponses.map(datum => {
+      return `
+<section class="page">
+<p>${datum['text']}</p>
+</section>
+      `
+    })
+        .join('\n')
+      }
+<style>
+
+
+section {
+  page-break-after: always;
+}
+
+@page {
+  size: A5 portrait;
+}
+</style>
+  </body>
 </html>`
-    fs.writeFileSync(outputPath, outputHTML, 'utf8');
+    fs.writeFileSync(iaResponsesPath, iaResponsesHTML, 'utf8');
+
+
+    fs.writeFileSync('outputs/résumé.txt', `Résumé des générations :
+${sets.map(({fileName, title, data}) => `* ${fileName}.csv & ${fileName}.html : ${title} (${data.length} expériences)`).join('\n')}`, 'utf8')
+    
     console.log('done, bye');
   })
