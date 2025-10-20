@@ -13,6 +13,22 @@ import('d3-dsv')
     }, '').trim();
     input = dsv.dsvFormat(";").parse(input);
 
+    const clusters = dsv.csvParse(fs.readFileSync('inputs/Cluster clean Cortexte.csv', 'utf8'));
+    const problemes = dsv.tsvParse(fs.readFileSync('inputs/LLM_Extraction_Problemes_Services_Publics_Conforme.csv', 'utf8'));
+
+    const clustersMap = new Map();
+    const problemsMap = new Map();
+    clusters.forEach(({ID_exprien,PC_ITFull1}) => clustersMap.set(ID_exprien,PC_ITFull1))
+
+    problemes.forEach(({ID, Problème, Contexte}) => {
+      const item = {probleme: Problème, contexte: Contexte};
+      if (!problemsMap.get(ID)) {
+        problemsMap.set(ID, [item])
+      } else {
+        const existing = problemsMap.get(ID);
+        problemsMap.set(ID, [...existing, item])
+      }
+    })
     // const inputJSON = fs.readFileSync('inputs/export-experiences.json', 'utf8').trim();
     // const cleanJSON = inputJSON.split('\n')
     // .map((line, i) => {
@@ -31,29 +47,44 @@ import('d3-dsv')
 
     const inputCleanCsv = dsv.csvFormat(input);
     fs.writeFileSync(`outputs/input-clean.csv`, inputCleanCsv, 'utf8');
+    const inputEnriched = input.map(item => {
+      const outputItem = {...item}
+      const id = item['ID expérience']
+      if (clustersMap.get(id)) {
+        outputItem.cluster = clustersMap.get(id);
+      }
+      if (problemsMap.get(id)) {
+        const pbs = problemsMap.get(id);
+        outputItem.problemes = pbs.map(p => p.probleme);
+        outputItem.problemes_avec_contextes = pbs.map(({probleme, contexte}) => `${probleme} (${contexte})`)
+      }
+      return outputItem;
+    });
+    fs.writeFileSync(`outputs/input-clean-enriched.csv`, dsv.csvFormat(inputEnriched), 'utf8');
+
     const baseFilter = input.filter(d => {
       const respIA = ['1', '2', '3'].find(n => d[`Taux de similarité réponse IA structure ${n}`] !== '' && +d[`Taux de similarité réponse IA structure ${n}`] >= 50);
       const neg = d['Ressenti usager'] === 'Négatif';
       return respIA && neg;
     });
-    
+
     // let nbAvecRespIa = 0;
     const iaResponses = input.reduce((res, d) => {
       // let hasIt = false;
       ['1', '2', '3']
-      .forEach(n => {
-        
-        const respIA = d[`Taux de similarité réponse IA structure ${n}`] !== '' && +d[`Taux de similarité réponse IA structure ${n}`] >= 50;
-        if (respIA) {
-          hasIt = true;
-          const respText = d[`Réponse structure ${n}`];
-          const item = {
-            text: respText,
-            structure: d[`Intitulé structure ${n}`]
-          };
-          res.push(item)
-        }
-      });
+        .forEach(n => {
+
+          const respIA = d[`Taux de similarité réponse IA structure ${n}`] !== '' && +d[`Taux de similarité réponse IA structure ${n}`] >= 50;
+          if (respIA) {
+            hasIt = true;
+            const respText = d[`Réponse structure ${n}`];
+            const item = {
+              text: respText,
+              structure: d[`Intitulé structure ${n}`]
+            };
+            res.push(item)
+          }
+        });
       // if (hasIt && d['Ressenti usager'] === 'Négatif') {
       //   nbAvecRespIa++;
       // }
@@ -87,6 +118,26 @@ import('d3-dsv')
         title: 'Réponse IA>50%, exp négative, plus de 2000 caractères, au moins un acronyme',
         data: baseFilter.filter(d => d['Description'].length > 2000 && d['Description'].match(/\b[A-Z]{3,20}\b/))
       },
+      {
+        fileName: 'min1000plrs_structures',
+        title: 'Réponse IA>50%, exp négative, plus de 1000 caractères, plusieurs structures impliquées',
+        data: baseFilter
+          .filter(d => d['Description'].length > 1000)
+          .filter(d => {
+            const keyBase = 'Intitulé structure';
+            const nbNotEmpty = [1, 2, 3].filter(n => d[`${keyBase} ${n}`]).length;
+            // if(d['Intitulé structure 2']) {
+            //   console.log('ok', d['Intitulé structure 2'], nbNotEmpty)
+            // }
+            return nbNotEmpty > 1;
+          })
+          .sort((a, b) => {
+            if (a['Description'].length > b['Description'].length) {
+              return -1;
+            }
+            return 1;
+          })
+      },
       // {
       //   fileName: 'romans',
       //   title: 'Les 200 réponses les plus longues (pour comparaison)',
@@ -100,7 +151,7 @@ import('d3-dsv')
       //   .slice(0, 200)
       // }
     ];
-    sets.forEach(({fileName, data, title}) => {
+    sets.forEach(({ fileName, data, title }) => {
       const outputHTML = `<!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -119,7 +170,7 @@ import('d3-dsv')
 </ul>
 </section>
   ${data.map(datum => {
-      return `
+        return `
 <section class="page">
 <h1>${datum['Titre']}</h1>
 <h3>${datum['Pseudonyme usager']} – le ${new Date(datum['Écrit le']).toLocaleDateString()}</h3>
@@ -133,52 +184,53 @@ ${datum['Description'].replace(/\|+/gm, '<br/>')}
 
 <ul>
 ${[
-          { key: 'Ressenti usager', name: 'Ressenti usager' },
-          { key: 'Démarches saisies par usager', name: 'Démarches saisies par usager' },
-          { key: 'Intitulé département usager', name: 'Département' },
-          { key: 'Accessibilité', name: 'Accessibilité' },
-        ]
-          .filter(({ key }) => (datum[key] || '').trim().length)
-          .map(({ key, name }) => `<li><strong>${name}</strong> : <span>${datum[key]}</span></li>`)
-          .join('\n')
-        }
+            { key: 'ID expérience', name: 'ID expérience' },
+            { key: 'Ressenti usager', name: 'Ressenti usager' },
+            { key: 'Démarches saisies par usager', name: 'Démarches saisies par usager' },
+            { key: 'Intitulé département usager', name: 'Département' },
+            { key: 'Accessibilité', name: 'Accessibilité' },
+          ]
+            .filter(({ key }) => (datum[key] || '').trim().length)
+            .map(({ key, name }) => `<li><strong>${name}</strong> : <span>${datum[key]}</span></li>`)
+            .join('\n')
+          }
 ${[
-          { key: 'Intitulé typologie', name: 'Intitulé typologie' },
-          { key: 'Canaux Typologie', name: 'Canaux' },
-          { key: 'Intitulé structure', name: 'Structures' },
-          { key: 'Réponse structure', name: 'Réponse structure' },
-          { key: 'Taux de similarité réponse IA structure', name: 'Taux de similarité réponse IA structure' },
-        ]
-          .map(({ key, name }) => {
-            let values = ['1', '2', '3'].map(n => datum[`${key} ${n}`] || '')
-              .filter(v => v.trim().length)
-            values = Array.from(new Set(values)).join(', ');
-            if (values.length) {
-              return `<li><strong>${name}</strong> : <span>${values.replace(/\|+/gm, '<br/>')}</span></li>`
-            }
-            return ''
-          })
-          .join('\n')
-        }
+            { key: 'Intitulé typologie', name: 'Intitulé typologie' },
+            { key: 'Canaux Typologie', name: 'Canaux' },
+            { key: 'Intitulé structure', name: 'Structures' },
+            { key: 'Réponse structure', name: 'Réponse structure' },
+            { key: 'Taux de similarité réponse IA structure', name: 'Taux de similarité réponse IA structure' },
+          ]
+            .map(({ key, name }) => {
+              let values = ['1', '2', '3'].map(n => datum[`${key} ${n}`] || '')
+                .filter(v => v.trim().length)
+              values = Array.from(new Set(values)).join(', ');
+              if (values.length) {
+                return `<li><strong>${name}</strong> : <span>${values.replace(/\|+/gm, '<br/>')}</span></li>`
+              }
+              return ''
+            })
+            .join('\n')
+          }
         
           ${[
-          { key: 'Accessibilité', name: 'Accessibilité' },
-          { key: 'Information/Explication', name: 'Information/Explication' },
-          { key: 'Relation', name: 'Relation' },
-          { key: 'Réactivité', name: 'Réactivité' },
-          { key: 'Simplicité/Complexité', name: 'Simplicité/Complexité' },
-        ]
-          .filter(({ key }) => (datum[key] || '').trim().length)
-          .map(({ key, name }) => `<li><strong>${name}</strong> : <span>${datum[key]}</span></li>`)
-          .join('\n')
-        
-        }
+            { key: 'Accessibilité', name: 'Accessibilité' },
+            { key: 'Information/Explication', name: 'Information/Explication' },
+            { key: 'Relation', name: 'Relation' },
+            { key: 'Réactivité', name: 'Réactivité' },
+            { key: 'Simplicité/Complexité', name: 'Simplicité/Complexité' },
+          ]
+            .filter(({ key }) => (datum[key] || '').trim().length)
+            .map(({ key, name }) => `<li><strong>${name}</strong> : <span>${datum[key]}</span></li>`)
+            .join('\n')
+
+          }
 </ul>
 </section>
       `
-    })
-        .join('\n')
-      }
+      })
+          .join('\n')
+        }
 <style>
 
 
@@ -231,7 +283,7 @@ section {
 
 
     fs.writeFileSync('outputs/résumé.txt', `Résumé des générations :
-${sets.map(({fileName, title, data}) => `* ${fileName}.csv & ${fileName}.html : ${title} (${data.length} expériences)`).join('\n')}`, 'utf8')
-    
+${sets.map(({ fileName, title, data }) => `* ${fileName}.csv & ${fileName}.html : ${title} (${data.length} expériences)`).join('\n')}`, 'utf8')
+
     console.log('done, bye');
   })
