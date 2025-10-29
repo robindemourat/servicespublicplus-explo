@@ -1,5 +1,137 @@
 const fs = require('fs');
 
+let structuresSeules = new Set()
+const simplifyStructure = val => {
+  let simp;
+  const acronymes = [ 'DRAAF', 'DREAL', 'ADEME', 'France connect', 'URSSAF', 'CROUS', 'Anact'];
+  const aliases = {
+    'CPAM': 'assurance maladie', 
+    'CNAM': 'assurance maladie',
+    'DTPN': 'police & gendarmerie',
+    'DIPN' : 'police & gendarmerie',
+    'gendarmerie': 'police & gendarmerie',
+    'police': 'police & gendarmerie',
+    'BOT ': 'police & gendarmerie',
+    'BPCO ': 'police & gendarmerie',
+    'DDPN': 'police & gendarmerie',
+    'Plainte en ligne (PEL)': 'police & gendarmerie',
+    'PHAROS': 'police & gendarmerie',
+    'THESEE': 'police & gendarmerie',
+
+    'ANTS': 'France Titres',
+    'France Titres': 'France Titres',
+
+    'CAF': 'caisses d\'allocations familiales',
+    'CNAF': 'caisses d\'allocations familiales',
+    'CAISSE NATIONALE DES ALLOCATIONS FAMILIALES': 'caisses d\'allocations familiales',
+
+    'douane': 'douanes',
+
+    'SIP': 'services des impôts',
+    'Service des Impôts': 'services des impôts',
+    'impôts': 'services des impôts',
+    'SGC': 'services des impôts',
+    'finances publiques': 'services des impôts',
+    'Paierie départementale': 'services des impôts',
+    'Impots.gouv.fr': 'services des impôts',
+
+    'Trésorerie amendes': 'trésoreries amendes',
+
+    'Ambassade': 'consulats et ambassades',
+    'Consulat': 'consulats et ambassades',
+    'France Consulaire': 'consulats et ambassades',
+
+    'Bureau Français': 'consulats et ambassades',
+    'CARSAT': 'CARSAT et caisses de retraites',
+    'AGIRC-ARRCO': 'CARSAT et caisses de retraites',
+    'retraitesdeletat.gouv.fr': 'CARSAT et caisses de retraites',
+    'Agence retraite': 'CARSAT et caisses de retraites',
+    'Assurance retraite': 'CARSAT et caisses de retraites',
+    'Retraite': 'CARSAT et caisses de retraites',
+
+    'CNOUS': 'CROUS',
+    
+
+    'Tribunal': 'justice & pénitentiaire',
+    'Cour d\'Appel': 'justice & pénitentiaire',
+    'Cour de Cassation': 'justice & pénitentiaire',
+    'Direction de l\'administration pénitentiaire': 'justice & pénitentiaire',
+    'Maison d\'arrêt': 'justice & pénitentiaire',
+    'justice': 'justice & pénitentiaire',
+    'Centre pénitentiaire': 'justice & pénitentiaire',
+    'Centre de détention': 'justice & pénitentiaire',
+    'services pénitentiaires': 'justice & pénitentiaire',
+    'judiciaire': 'justice & pénitentiaire',
+    'Conseil de Prud\'hommes': 'justice & pénitentiaire',
+    'Conseil départemental de l\'accès au droit': 'justice & pénitentiaire',
+
+    'Centre du service national et de la jeunesse' : 'Centre du service national et de la jeunesse',
+    'SDCLR': 'Office national des combattants et victimes de guerre',
+
+    'Direction départementale': 'collectivités',
+    'Collectivités territoriales': 'collectivités',
+    'Ville': 'collectivités',
+    'Service départemental': 'collectivités',
+    'Secrétariat général commun': 'collectivités',
+    'Direction interrégionale': 'collectivités',
+    'MUNICIPALE': 'collectivités',
+
+    'préfecture': 'préfectures',
+    'prefecture': 'préfectures',
+    'MI-ATE': 'préfectures',
+
+    'MSA': 'sécurité sociale',
+    'CAISSE NATIONALE MILITAIRE DE SECURITE SOCIALE': 'sécurité sociale',
+    'Caisse de Sécurité Sociale': 'sécurité sociale',
+
+    'Ecole': 'enseignement',
+    'Collège': 'enseignement',
+    'Lycée': 'enseignement',
+    'Université': 'enseignement',
+    'RECTORAT': 'enseignement',
+    'DSDEN' :'enseignement',
+
+    'Archives': 'archives',
+    'Bibliothèque nationale de France': 'archives',
+
+
+    'France Travail': 'France Travail',
+
+    'Musée': 'établissements culturels',
+    'Bibliothèque': 'établissements culturels',
+    'Théâtre': 'établissements culturels',
+    'Comédie Française': 'établissements culturels',
+    'La Cinémathèque française': 'établissements culturels',
+    'Palais de Tokyo': 'établissements culturels',
+    'Pass Culture': 'établissements culturels',
+
+    'Trésorerie hospitalière': 'hopitaux',
+    'Trésorerie HOSPITALIERE': 'hopitaux',
+    'HOPITAUX': 'hopitaux',
+
+    'Service de publicité foncière': 'Service de publicité foncière',
+
+    'Ministère de ': 'ministères et autres agences nationales',
+    'Direction interministérielle': 'ministères et autres agences nationales',
+    'agence': 'ministères et autres agences nationales',
+
+  }
+  simp = acronymes.find(accr => val.toLowerCase().includes(accr.toLowerCase()));
+  if (!simp) {
+    Object.entries(aliases).forEach(([accr, label]) => {
+      if (val.toLowerCase().includes(accr.toLowerCase())) {
+        simp = label
+      }
+    })
+  }
+  if (!simp) {
+    // console.log('pas attribué : ', val);
+    structuresSeules.add(val);
+    return 'autres';
+  }
+  return simp;
+}
+
 import('d3-dsv')
   .then(dsv => {
     // chargement du fichier en csv
@@ -58,15 +190,26 @@ import('d3-dsv')
         outputItem.problemes = pbs.map(p => p.probleme);
         outputItem.problemes_avec_contextes = pbs.map(({probleme, contexte}) => `${probleme} (${contexte})`)
       }
+      outputItem['type de structure'] = simplifyStructure(item['Intitulé structure 1'])
       return outputItem;
     });
+    console.log('structures seules');
+    console.log(Array.from(structuresSeules).sort().join('\n'));
+    console.log('=======> %s structures non-catégorisées', Array.from(structuresSeules).length);
     fs.writeFileSync(`outputs/input-clean-enriched.csv`, dsv.csvFormat(inputEnriched), 'utf8');
-
-    const baseFilter = input.filter(d => {
+    fs.writeFileSync(`outputs/input-clean-clusters-only.csv`, dsv.csvFormat(
+      inputEnriched.filter(d => d.cluster)
+    ), 'utf8');
+    console.log('%s expériences de base', input.length);
+    console.log('%s expériences  négatives', input.filter(d => d['Ressenti usager'] === 'Négatif').length);
+    const baseFilter = inputEnriched.filter(d => {
       const respIA = ['1', '2', '3'].find(n => d[`Taux de similarité réponse IA structure ${n}`] !== '' && +d[`Taux de similarité réponse IA structure ${n}`] >= 50);
       const neg = d['Ressenti usager'] === 'Négatif';
       return respIA && neg;
     });
+    console.log('%s expériences négatives avec plus de 50% d\'utilisation de l\'IA', baseFilter.length);
+    console.log('%s expériences négatives avec plus de 50% d\'utilisation de l\'IA et +1000 caractères', baseFilter.filter(d =>  d['Description'].length > 1000).length);
+    console.log('%s expériences négatives avec plus de 50% d\'utilisation de l\'IA et +2000 caractères', baseFilter.filter(d =>  d['Description'].length > 2000).length);
 
     // let nbAvecRespIa = 0;
     const iaResponses = input.reduce((res, d) => {
@@ -194,7 +337,7 @@ ${[
             .map(({ key, name }) => `<li><strong>${name}</strong> : <span>${datum[key]}</span></li>`)
             .join('\n')
           }
-${[
+        ${[
             { key: 'Intitulé typologie', name: 'Intitulé typologie' },
             { key: 'Canaux Typologie', name: 'Canaux' },
             { key: 'Intitulé structure', name: 'Structures' },

@@ -28,7 +28,7 @@ import('d3-dsv')
             const { document } = (new JSDOM(html)).window;
             const content = document.querySelector('.doc-content');
             const tabTitles = new Set([
-              'écrivain','agent public', 'assistant_social', 'designer', 'militant_inclusivite', 'frise_chronologique', '_original'
+              'écrivain','agent public', 'assistant_social', 'designer', 'militant_inclusivite', 'frise_chronologique', 'chercheur', '_original'
             ]);
             // console.log(content);
             const byTabs = Array.from(content.childNodes).reduce((res, block) => {
@@ -53,9 +53,10 @@ import('d3-dsv')
             // console.log(byTabs);
             Promise.all(byTabs.map(({ id, blocks }) => {
               const path = `inputs/folders/${datum.id}/${id}.md`;
-              const text = blocks.map(({ text }) => {
-                return NodeHtmlMarkdown.translate(text);
-              }).join('\n\n').trim();
+              // const text = id === 'frise_chronologique' ? blocks.map(({text}) => text).join('\n\n').trim() : blocks.map(({ text }) => {
+              //   return NodeHtmlMarkdown.translate(text);
+              // }).join('\n\n').trim();
+              const text = blocks.map(({text}) => text).join('\n\n').trim()
               // console.log(text)
               console.log('write', path);
               writeFileSync(path, text, 'utf8');
