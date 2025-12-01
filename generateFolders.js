@@ -24,13 +24,13 @@ const prenoms = [
   'Alix'];
 
 const agentsNames = {
-  'écrivain': 'écrivain',
+  'écrivain': 'écrivain·e',
   'agent public': 'agent public',
-  'assistant_social': 'assistant social',
+  'assistant_social': 'travailleur·euse associatif·ve',
   'designer': 'designer des services publics',
-  'militant_inclusivite': 'militant pour l\inclusivité numérique',
+  'militant_inclusivite': 'militant·e pour l\inclusivité numérique',
   'frise_chronologique': 'frise chronologique',
-  'chercheur': 'chercheur en sciences sociales passionné par l\'étude des labyrinthes administratifs'
+  'chercheur': 'chercheur·e en sciences sociales passionné·e par l\'étude des labyrinthes administratifs'
 }
 
 const tabTitles = new Set([
@@ -48,12 +48,12 @@ const prefixes = {
   'assistant_social': () => {
     const prenom1 = prenoms[parseInt(Math.random() * prenoms.length)];
     const prenom2 = prenoms[parseInt(Math.random() * prenoms.length)];
-    return `<div class="post-it">Hello ${prenom1}, <br/>je pars en congés 2 semaines est-ce que tu pourrais reprendre ce dossier stp ? merci d'avance, je te revaudrais ça ! <br/>Bises, ${prenom2} </div>`
+    return `<div class="post-it">Hello ${prenom1}, <br/>Comme tu le sais je déménage dans une autre ville, est-ce que tu pourrais reprendre le flambeau pour aider la personne sur ce dossier stp ? merci d'avance ! <br/>Bises, ${prenom2} </div>`
   },
   'designer': () => {
     return `<div class="header-agence">
     <h2>Agence Pour de Vrai Pour de Vrai</h2>
-    <h1>Mission de conseil pour la task force « pour un numérique plus ♡&nbsp;inclusif&nbsp;♡ »</h1>
+    <h1>Mission de conseil pour la task force « pour un numérique plus inclusif »</h1>
     <h3>Support pour la présentation du 12 décembre : «&nbsp;focus sur une étude de cas révélatrice des problématiques d'expérience utilisateur&nbsp;»</h3>
     </div>`
   },
@@ -216,29 +216,44 @@ import('d3-dsv')
             <section class="piece feedback">
             <div class="header">
               <h1>Fiche d'aide à la réflexion</h1>
+              <h2>à partir du document factice <br/>« ${agentsNames[tabId]} »</h2>
               <ul>
-                  <li>Cas : <strong>${titre}</strong> (ID&nbsp;expérience n° ${item['ID expérience']})</li>
-                  <li>Agent factice support à la réflexion sur le cas : <strong>${agentsNames[tabId]}</strong></li>
+                  <li>Cas étudié par l'agent factice « ${agentsNames[tabId]} » : <strong>${titre}</strong> (ID&nbsp;expérience n°${item['ID expérience']})</li>
+                  <!--<li>Agent factice support à la réflexion sur le cas : <strong>${agentsNames[tabId]}</strong></li>-->
               </ul>
               
             </div>
             <div class="feedback-section">
                 <div class="question">
-                  Dans ce document, quelles informations semblent intéressantes pour mieux comprendre la situation/le contexte du témoignage initial ?
+                  Dans ce document, quelles informations vous semblent intéressantes pour mieux comprendre la situation/le contexte du témoignage initial ?
                 </div>
                 <div class="response-space">
                 </div>
             </div>
             <div class="feedback-section">
                 <div class="question">
-                  Qu'est-ce que la personne ne voit pas ? Fait-elle des erreurs ? Qu'est-ce qui vous surprend dans le document produit ?
+                  Qu'est-ce que l'agent factice ne voit pas ? Fait-il des erreurs ?
                 </div>
                 <div class="response-space">
                 </div>
             </div>
             <div class="feedback-section">
                 <div class="question">
-                  Quelles organisations ou personnes faudrait-il impliquer d’autres pour une meilleure prise en compte du témoignage ? 
+                  Qu'est-ce qui vous surprend ou vous marque dans le document produit ?
+                </div>
+                <div class="response-space">
+                </div>
+            </div>
+            <div class="feedback-section">
+                <div class="question">
+                  Qu'est-ce qui aurait pu être fait ou écrit différemment par cet agent factice ?
+                </div>
+                <div class="response-space">
+                </div>
+            </div>
+            <div class="feedback-section">
+                <div class="question">
+                  À partir de votre lecture du document, quelles autres organisations ou personnes faudrait-il impliquer pour une meilleure prise en compte du témoignage ? 
                 </div>
                 <div class="response-space">
                 </div>
